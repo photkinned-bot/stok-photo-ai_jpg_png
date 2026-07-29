@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fast StockMeta AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --accent: #6366f1;
+    --accent-hover: #4f46e5;
+    --text: #f8fafc;
+    --muted: #94a3b8;
+    --border: #334155;
+    --success: #10b981;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; padding: 20px; display: flex; justify-content: center; }
+  .container { width: 100%; max-width: 600px; margin: 0 auto; }
+
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 6px; text-align: center; }
+  p.subtitle { color: var(--muted); font-size: 13px; text-align: center; margin-bottom: 20px; }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+
+  .upload-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 32px 16px; text-align: center; cursor: pointer; transition: 0.2s; position: relative; }
+  .upload-zone:hover { border-color: var(--accent); background: rgba(99, 102, 241, 0.05); }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+
+  .preview-area { display: none; text-align: center; }
+  .preview-area img { max-height: 200px; border-radius: 8px; margin-bottom: 10px; }
+
+  details { margin-bottom: 16px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 12px; }
+  summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+  .config-group { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+  input[type="text"], input[type="password"], select { background: #0f172a; border: 1px solid var(--border); color: var(--text); padding: 8px; border-radius: 6px; font-size: 12px; width: 100%; }
+  .key-row { display: flex; gap: 6px; }
+  .key-row input { flex: 1; min-width: 0; }
+  .icon-btn { flex-shrink: 0; background: #0f172a; border: 1px solid var(--border); color: var(--text); border-radius: 6px; font-size: 14px; padding: 0 12px; cursor: pointer; }
+  .icon-btn:hover { border-color: var(--accent); }
+  .hint { font-size: 10.5px; color: var(--muted); margin-top: -2px; }
+
+  .field-group { margin-bottom: 12px; }
+  label { font-size: 11px; text-transform: uppercase; color: var(--muted); font-weight: 600; display: block; margin-bottom: 4px; }
+  input.out-field, textarea.out-field { width: 100%; background: #0f172a; border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 10px; font-size: 13px; font-family: inherit; }
+
+  .tags-container { display: flex; flex-wrap: wrap; gap: 6px; background: #0f172a; border: 1px solid var(--border); border-radius: 6px; padding: 8px; max-height: 120px; overflow-y: auto; }
+  .tag { background: rgba(99, 102, 241, 0.2); border: 1px solid var(--accent); color: #a5b4fc; font-size: 11px; padding: 2px 8px; border-radius: 4px; cursor: pointer; }
+  .tag.removed { opacity: 0.4; text-decoration: line-through; background: transparent; border-color: var(--border); }
+
+  .status { font-size: 13px; text-align: center; color: var(--accent); margin: 12px 0; font-weight: 600; display: none; }
+
+  .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; transition: 0.2s; background: var(--accent); color: white; }
+  .btn:hover { background: var(--accent-hover); }
+  .btn-save { background: var(--success); display: none; margin-top: 10px; }
+  .btn-save:hover { background: #059669; }
+  .btn-secondary { background: transparent; border: 1px solid var(--accent); color: #c7d2fe; margin-top: 10px; }
+  .btn-secondary:hover { background: rgba(99, 102, 241, 0.15); }
+
+  .error { color: #f87171; background: rgba(248, 113, 113, 0.1); padding: 10px; border-radius: 6px; font-size: 12px; margin-top: 10px; display: none; word-break: break-word; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Fast StockMeta AI</h1>
+  <p class="subtitle">Автоматичне створення метаданих без втрати якості фото</p>
+
+  <details>
+    <summary>⚙️ Налаштування API та мови</summary>
+    <div class="config-group">
+      <label>Провайдер</label>
+      <select id="providerSelect" onchange="switchProvider()">
+        <option value="gemini">Google Gemini</option>
+        <option value="claude">Anthropic Claude</option>
+        <option value="openai">OpenAI ChatGPT</option>
+      </select>
+
+      <label>Модель</label>
+      <select id="modelSelect" onchange="saveSettings()"></select>
+
+      <label>API Key</label>
+      <div class="key-row">
+        <input type="password" id="apiKeyInput" placeholder="Вставте ваш API Key сюди" onchange="saveSettings()">
+        <button type="button" class="icon-btn" id="toggleKeyBtn" onclick="toggleKeyVisibility()">👁</button>
+      </div>
+      <div class="hint">Ключ зберігається лише локально, у пам'яті цього браузера.</div>
+
+      <label>Мова метаданих</label>
+      <select id="langSelect" onchange="saveSettings()">
+        <option value="en">English (Стандарт для стоків)</option>
+        <option value="uk">Українська</option>
+        <option value="de">Deutsch</option>
+      </select>
+    </div>
+  </details>
+
+  <div class="card">
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="fileInput" accept="image/jpeg" onchange="handleFile(this.files[0])">
+      <div style="font-size: 32px;">📁</div>
+      <div style="font-weight: 600; margin-top: 8px;">Оберіть або перетягніть JPG фото</div>
+      <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">Підтримуються файли до 45 МБ. Фото зберігається без стиснення.</div>
+    </div>
+
+    <div class="preview-area" id="previewArea">
+      <img id="previewImg" src="" alt="Preview">
+      <div style="font-size: 12px; color: var(--muted);" id="fileName"></div>
+      <button type="button" class="btn btn-secondary" id="nextPhotoBtn" onclick="resetForNextPhoto()">🔄 Наступне фото</button>
+    </div>
+
+    <div class="status" id="statusText">⏳ Обробка та аналіз AI...</div>
+    <div class="error" id="errorBox"></div>
+
+    <div id="resultsArea" style="display: none; margin-top: 16px;">
+      <div class="field-group">
+        <label>Назва (Title)</label>
+        <input type="text" id="outTitle" class="out-field">
+      </div>
+      <div class="field-group">
+        <label>Опис (Description)</label>
+        <textarea id="outDesc" class="out-field" rows="3"></textarea>
+      </div>
+      <div class="field-group">
+        <label>Ключові слова (<span id="kwCount">0</span>)</label>
+        <div class="tags-container" id="tagsContainer"></div>
+      </div>
+
+      <button class="btn btn-save" id="saveBtn" onclick="processAndSave()">💾 Зберегти фото з метаданими</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentFile = null;
+let currentKeywords = [];
+let currentPreviewUrl = null;
+let requestToken = 0; // інвалідовує застарілі відповіді AI, якщо перейти до наступного фото раніше
+
+const MAX_FILE_SIZE = 45 * 1024 * 1024; // 45 МБ, як зазначено в інтерфейсі
+
+// Найактуальніші на сьогодні моделі кожного провайдера (перевірено окремо для цієї збірки).
+// Перший варіант у кожному списку — рекомендований баланс якості/швидкості/ціни.
+const MODELS = {
+  gemini: [
+    { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash — рекомендовано' },
+    { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro — макс. якість (preview)' },
+    { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite — найшвидша' }
+  ],
+  claude: [
+    { id: 'claude-opus-5', label: 'Claude Opus 5 — рекомендовано' },
+    { id: 'claude-sonnet-5', label: 'Claude Sonnet 5 — баланс ціни/якості' },
+    { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5 — найшвидша' }
+  ],
+  openai: [
+    { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra — рекомендовано' },
+    { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol — макс. якість' },
+    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna — найшвидша' }
+  ]
+};
+
+window.onload = () => {
+  const p = localStorage.getItem('sm_p') || 'gemini';
+  document.getElementById('providerSelect').value = p;
+  populateModelSelect(p);
+  document.getElementById('langSelect').value = localStorage.getItem('sm_lang') || 'en';
+  loadKey();
+};
+
+function populateModelSelect(provider) {
+  const modelSelect = document.getElementById('modelSelect');
+  modelSelect.innerHTML = '';
+  MODELS[provider].forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.id;
+    opt.textContent = m.label;
+    modelSelect.appendChild(opt);
+  });
+  const saved = localStorage.getItem('sm_model_' + provider);
+  if (saved && MODELS[provider].some(m => m.id === saved)) {
+    modelSelect.value = saved;
+  }
+}
+
+function switchProvider() {
+  const provider = document.getElementById('providerSelect').value;
+  populateModelSelect(provider);
+  saveSettings();
+  loadKey();
+}
+
+function saveSettings() {
+  const p = document.getElementById('providerSelect').value;
+  localStorage.setItem('sm_p', p);
+  localStorage.setItem('sm_model_' + p, document.getElementById('modelSelect').value);
+  localStorage.setItem('sm_lang', document.getElementById('langSelect').value);
+  localStorage.setItem('sm_key_' + p, document.getElementById('apiKeyInput').value.trim());
+}
+
+function loadKey() {
+  const p = document.getElementById('providerSelect').value;
+  document.getElementById('apiKeyInput').value = localStorage.getItem('sm_key_' + p) || '';
+}
+
+function toggleKeyVisibility() {
+  const input = document.getElementById('apiKeyInput');
+  const btn = document.getElementById('toggleKeyBtn');
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁';
+  }
+}
+
+function showError(msg) {
+  const eb = document.getElementById('errorBox');
+  eb.textContent = msg;
+  eb.style.display = msg ? 'block' : 'none';
+}
+
+async function handleFile(file) {
+  if (!file) return;
+
+  const looksLikeJpeg = file.type.includes('jpeg') || /\.(jpe?g)$/i.test(file.name || '');
+  if (!looksLikeJpeg) {
+    showError('Вкажіть файл у форматі JPG/JPEG.');
+    return;
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    showError(`Файл завеликий (${(file.size / 1024 / 1024).toFixed(1)} МБ). Максимум — 45 МБ.`);
+    return;
+  }
+
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (!key) {
+    showError('Будь ласка, розгорніть налаштування та вкажіть API Key.');
+    return;
+  }
+
+  showError('');
+  currentFile = file;
+  const myToken = ++requestToken;
+
+  document.getElementById('uploadZone').style.display = 'none';
+  document.getElementById('previewArea').style.display = 'block';
+  if (currentPreviewUrl) URL.revokeObjectURL(currentPreviewUrl);
+  currentPreviewUrl = URL.createObjectURL(file);
+  document.getElementById('previewImg').src = currentPreviewUrl;
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('statusText').style.display = 'block';
+  document.getElementById('resultsArea').style.display = 'none';
+  document.getElementById('saveBtn').style.display = 'none';
+
+  try {
+    // Це зменшене зображення йде ТІЛЬКИ в AI для аналізу.
+    // Збереження в кінці завжди працює з оригінальним файлом (currentFile), без перестиснення.
+    const resizedBase64 = await resizeImageForAI(file, 1568);
+    const result = await analyzePhoto(resizedBase64, key);
+    if (myToken !== requestToken) return; // користувач вже перейшов до іншого фото — цей результат більше не актуальний
+
+    document.getElementById('outTitle').value = result.title || '';
+    document.getElementById('outDesc').value = result.description || '';
+    currentKeywords = Array.isArray(result.keywords) ? result.keywords.filter(k => typeof k === 'string' && k.trim()) : [];
+    renderTags();
+
+    document.getElementById('statusText').style.display = 'none';
+    document.getElementById('resultsArea').style.display = 'block';
+    document.getElementById('saveBtn').style.display = 'block';
+  } catch (err) {
+    if (myToken !== requestToken) return;
+    document.getElementById('statusText').style.display = 'none';
+    showError('Помилка аналізу: ' + err.message);
+  }
+}
+
+function resizeImageForAI(file, maxSide) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.src = url;
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let w = img.width, h = img.height;
+      if (w > maxSide || h > maxSide) {
+        if (w > h) { h = Math.round((h * maxSide) / w); w = maxSide; }
+        else { w = Math.round((w * maxSide) / h); h = maxSide; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.85).split(',')[1]);
+    };
+    img.onerror = () => reject(new Error('Не вдалося зчитати файл зображення.'));
+  });
+}
+
+// Інструкції щодо ЗМІСТУ метаданих, мовою результату.
+// Формат JSON для Gemini й OpenAI задається окремою схемою (надійніше за прохання в тексті),
+// а для Claude формат додається окремим реченням нижче (CLAUDE_JSON_SUFFIX).
+const CONTENT_PROMPTS = {
+  en: 'You are an expert stock photography metadata specialist. Study the photo carefully and write SEO-optimized metadata for microstock platforms such as Adobe Stock, Shutterstock and iStock: a concise natural title, a two-sentence description, and a list of relevant keywords ordered from most to least important, covering the subject, materials, colors, mood, style and likely use cases. Avoid ALL CAPS and keyword stuffing. Respond entirely in English.',
+  uk: 'Ви — експерт з метаданих для фотостоків. Уважно проаналізуйте фото і складіть SEO-оптимізовані метадані для мікростокових платформ (Adobe Stock, Shutterstock, iStock): стислу природну назву, опис на два речення та список релевантних ключових слів від найважливіших до другорядних, що охоплюють об\u2019єкт, матеріали, кольори, настрій, стиль і можливе застосування. Не використовуйте ВЕЛИКІ ЛІТЕРИ та не переспамлюйте ключовими словами. Відповідайте українською мовою.',
+  de: 'Sie sind Experte für Stockfoto-Metadaten. Analysieren Sie das Foto sorgfältig und erstellen Sie SEO-optimierte Metadaten für Microstock-Plattformen wie Adobe Stock, Shutterstock und iStock: einen prägnanten, natürlichen Titel, eine Beschreibung in zwei Sätzen und eine Liste relevanter Schlüsselwörter, geordnet von den wichtigsten zu den weniger wichtigen, die Motiv, Materialien, Farben, Stimmung, Stil und mögliche Verwendungszwecke abdecken. Verwenden Sie keine GROSSBUCHSTABEN und kein Keyword-Stuffing. Antworten Sie vollständig auf Deutsch.'
+};
+
+const CLAUDE_JSON_SUFFIX = ' Return ONLY a single valid JSON object in exactly this shape, with no markdown code fences and no extra commentary before or after it: {"title": "...", "description": "...", "keywords": ["...", "..."]} (up to 40 keywords).';
+
+function buildJsonSchema() {
+  return {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'SEO-friendly title, no more than 70 characters, in the requested language.' },
+      description: { type: 'string', description: 'Natural two-sentence description of the image, in the requested language.' },
+      keywords: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Up to 40 relevant single-word or short-phrase keywords, ordered from most to least relevant, in the requested language.'
+      }
+    },
+    required: ['title', 'description', 'keywords']
+  };
+}
+
+async function analyzePhoto(base64Data, apiKey) {
+  const provider = document.getElementById('providerSelect').value;
+  const model = document.getElementById('modelSelect').value;
+  const lang = document.getElementById('langSelect').value;
+  const contentPrompt = CONTENT_PROMPTS[lang];
+
+  if (provider === 'gemini') {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ inline_data: { mime_type: 'image/jpeg', data: base64Data } }, { text: contentPrompt }] }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: buildJsonSchema(),
+          maxOutputTokens: 2048
+        }
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || 'Gemini API Error');
+    const candidate = data.candidates && data.candidates[0];
+    const text = candidate?.content?.parts?.[0]?.text;
+    if (!text) {
+      const reason = candidate?.finishReason;
+      throw new Error(reason === 'SAFETY' ? 'Запит заблоковано фільтром безпеки Gemini.' : 'Gemini повернув порожню відповідь.');
+    }
+    return JSON.parse(cleanJson(text));
+  }
+
+  if (provider === 'claude') {
+    const body = {
+      model: model,
+      max_tokens: 2048,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64Data } },
+          { type: 'text', text: contentPrompt + CLAUDE_JSON_SUFFIX }
+        ]
+      }]
+    };
+    // Це просте завдання не потребує глибоких роздумів — низький effort economить токени й час
+    // на моделях з адаптивним мисленням за замовчуванням (Opus 5, Sonnet 5).
+    if (model.includes('opus-5') || model.includes('sonnet-5')) {
+      body.effort = 'low';
+    }
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || 'Claude API Error');
+    // Не покладаємось на content[0] — на моделях з мисленням за замовчуванням
+    // першим блоком може бути "thinking", а не "text".
+    const textBlock = Array.isArray(data.content) ? data.content.find(b => b.type === 'text') : null;
+    if (!textBlock) throw new Error('Claude повернув порожню відповідь.');
+    return JSON.parse(cleanJson(textBlock.text));
+  }
+
+  if (provider === 'openai') {
+    const res = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: model,
+        input: [{
+          role: 'user',
+          content: [
+            { type: 'input_text', text: contentPrompt },
+            { type: 'input_image', image_url: `data:image/jpeg;base64,${base64Data}` }
+          ]
+        }],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'stock_metadata',
+            strict: true,
+            schema: { ...buildJsonSchema(), additionalProperties: false }
+          }
+        }
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || 'OpenAI API Error');
+    const message = Array.isArray(data.output) ? data.output.find(o => o.type === 'message') : null;
+    const textPart = message?.content?.find(c => c.type === 'output_text');
+    if (!textPart) throw new Error('OpenAI повернув порожню відповідь.');
+    return JSON.parse(cleanJson(textPart.text));
+  }
+}
+
+function cleanJson(str) {
+  let s = str.replace(/```json|```/g, '').trim();
+  // Захисний фолбек: якщо модель додала текст поза JSON, вирізаємо саму об'єктну частину.
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+    s = s.slice(start, end + 1);
+  }
+  return s;
+}
+
+function resetForNextPhoto() {
+  requestToken++; // інвалідовуємо будь-яку ще не завершену AI-відповідь для попереднього фото
+
+  if (currentPreviewUrl) {
+    URL.revokeObjectURL(currentPreviewUrl);
+    currentPreviewUrl = null;
+  }
+  currentFile = null;
+  currentKeywords = [];
+
+  document.getElementById('fileInput').value = '';
+  document.getElementById('previewImg').src = '';
+  document.getElementById('fileName').textContent = '';
+  document.getElementById('outTitle').value = '';
+  document.getElementById('outDesc').value = '';
+  document.getElementById('tagsContainer').innerHTML = '';
+  updateKwCount();
+
+  showError('');
+  document.getElementById('statusText').style.display = 'none';
+  document.getElementById('resultsArea').style.display = 'none';
+  document.getElementById('saveBtn').style.display = 'none';
+  document.getElementById('previewArea').style.display = 'none';
+  document.getElementById('uploadZone').style.display = 'block';
+}
+
+function renderTags() {
+  const container = document.getElementById('tagsContainer');
+  container.innerHTML = '';
+  currentKeywords.forEach((kw) => {
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.textContent = kw;
+    tag.onclick = () => {
+      tag.classList.toggle('removed');
+      updateKwCount();
+    };
+    container.appendChild(tag);
+  });
+  updateKwCount();
+}
+
+function updateKwCount() {
+  const active = document.querySelectorAll('#tagsContainer .tag:not(.removed)').length;
+  document.getElementById('kwCount').textContent = active;
+}
+
+// Знаходить безпечну точку вставки XMP-сегмента: одразу ПІСЛЯ наявних APP0/APP1
+// (JFIF/EXIF) сегментів, якщо вони є на початку файлу, а не сліпо перед ними.
+// Це важливо, бо багато програм і стокових сайтів очікують EXIF першим сегментом
+// одразу після SOI — вставка XMP перед ним могла ламати читання EXIF-даних.
+async function findXmpInsertionOffset(file) {
+  const headerChunk = await file.slice(0, 131072).arrayBuffer();
+  const bytes = new Uint8Array(headerChunk);
+  if (bytes.length < 4 || bytes[0] !== 0xFF || bytes[1] !== 0xD8) {
+    throw new Error('Файл не є коректним JPEG (відсутній заголовок SOI).');
+  }
+  let offset = 2;
+  while (offset + 4 <= bytes.length) {
+    if (bytes[offset] !== 0xFF) break;
+    const marker = bytes[offset + 1];
+    if (marker >= 0xD0 && marker <= 0xD7) { offset += 2; continue; } // RST0–RST7: маркери без поля довжини
+    if (marker === 0xD9 || marker === 0xDA) break; // EOI або початок скану — далі не йдемо
+    if (marker === 0xE0 || marker === 0xE1) { // APP0 (JFIF) або APP1 (EXIF/XMP)
+      const segLen = (bytes[offset + 2] << 8) | bytes[offset + 3];
+      if (segLen < 2) break; // пошкоджений сегмент — зупиняємось на безпечній позиції
+      offset += 2 + segLen;
+      continue;
+    }
+    break; // будь-який інший маркер — вставляємо новий XMP-сегмент перед ним
+  }
+  return offset;
+}
+
+async function processAndSave() {
+  try {
+    const title = document.getElementById('outTitle').value;
+    const desc = document.getElementById('outDesc').value;
+    const tags = Array.from(document.querySelectorAll('#tagsContainer .tag:not(.removed)')).map(t => t.textContent);
+
+    const xmpString = `<?xpacket begin="\uFEFF" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">
+   <dc:title><rdf:Alt><rdf:li xml:lang="x-default">${escapeXml(title)}</rdf:li></rdf:Alt></dc:title>
+   <dc:description><rdf:Alt><rdf:li xml:lang="x-default">${escapeXml(desc)}</rdf:li></rdf:Alt></dc:description>
+   <dc:subject><rdf:Bag>${tags.map(t => `<rdf:li>${escapeXml(t)}</rdf:li>`).join('')}</rdf:Bag></dc:subject>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta><?xpacket end="w"?>`;
+
+    const encoder = new TextEncoder();
+    const xmpHeader = encoder.encode('http://ns.adobe.com/xap/1.0/\0');
+    const xmpData = encoder.encode(xmpString);
+
+    const segmentLength = 2 + xmpHeader.length + xmpData.length;
+    if (segmentLength > 0xFFFF) {
+      throw new Error('Забагато метаданих для одного JPEG-сегмента. Зменшіть кількість ключових слів або довжину опису.');
+    }
+
+    const app1Segment = new Uint8Array(4 + xmpHeader.length + xmpData.length);
+    app1Segment[0] = 0xFF;
+    app1Segment[1] = 0xE1;
+    app1Segment[2] = (segmentLength >> 8) & 0xFF;
+    app1Segment[3] = segmentLength & 0xFF;
+    app1Segment.set(xmpHeader, 4);
+    app1Segment.set(xmpData, 4 + xmpHeader.length);
+
+    const insertionOffset = await findXmpInsertionOffset(currentFile);
+
+    // Оригінальні байти фото (до і після точки вставки) копіюються без жодного
+    // перекодування чи стиснення — змінюються лише метадані, не сама картинка.
+    const headerSlice = currentFile.slice(0, insertionOffset);
+    const bodySlice = currentFile.slice(insertionOffset);
+
+    const finalBlob = new Blob([headerSlice, app1Segment, bodySlice], { type: 'image/jpeg' });
+
+    const a = document.createElement('a');
+    const downloadUrl = URL.createObjectURL(finalBlob);
+    a.href = downloadUrl;
+    a.download = currentFile.name.replace(/\.[^/.]+$/, "") + "_stock.jpg";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    setTimeout(() => URL.revokeObjectURL(downloadUrl), 10000);
+  } catch (err) {
+    showError('Помилка формування файлу: ' + err.message);
+  }
+}
+
+function escapeXml(str) {
+  return str.replace(/[<>&'"]/g, c => {
+    switch (c) {
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '&': return '&amp;';
+      case '\'': return '&apos;';
+      case '"': return '&quot;';
+    }
+  });
+}
+</script>
+</body>
+</html>
